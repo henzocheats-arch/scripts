@@ -387,56 +387,57 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -------------------------------------------------
--- SILENT AIM HOOK (metatable __namecall + __index)
+-- SILENT AIM (FireServer hook — safe version)
 -------------------------------------------------
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-local oldIndex = mt.__index
-setreadonly(mt, false)
-
 local function getSilentTarget()
-    return getClosest(Settings.SilentAimFOV, Settings.SilentAimVisCheck, Settings.SilentAimHead)
+    if not Settings.SilentAimEnabled then return nil end
+    local best, bestDist = nil, Settings.SilentFOV or 200
+    local mousePos = UserInputService:GetMouseLocation()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer then continue end
+        if Settings.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+        local char = plr.Character
+        if not char then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local head = char:FindFirstChild("Head")
+        if not hum or hum.Health <= 0 or not head then continue end
+        local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+        if not onScreen then continue end
+        local d = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if d < bestDist then
+            best = head
+            bestDist = d
+        end
+    end
+    return best
 end
+
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
 
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
 
     if Settings.SilentAimEnabled and not checkcaller() then
-        local target = getSilentTarget()
-        if target then
-            -- FindPartOnRayWithIgnoreList / FindPartOnRay
-            if (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist") and typeof(args[1]) == "Ray" then
-                local origin = args[1].Origin
-                local newDir = (target.Position - origin).Unit * 1000
-                args[1] = Ray.new(origin, newDir)
-                return oldNamecall(self, unpack(args))
-            end
-            -- Raycast
-            if method == "Raycast" and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
-                local origin = args[1]
-                args[2] = (target.Position - origin).Unit * 1000
-                return oldNamecall(self, unpack(args))
-            end
-        end
-    end
-    return oldNamecall(self, ...)
-end)
-
-mt.__index = newcclosure(function(self, key)
-    if Settings.SilentAimEnabled and not checkcaller() then
-        if typeof(self) == "Instance" and self:IsA("Mouse") then
+        if method == "FireServer" or method == "InvokeServer" then
             local target = getSilentTarget()
             if target then
-                if key == "Hit" then
-                    return CFrame.new(target.Position)
-                elseif key == "Target" then
-                    return target
+                -- replace any CFrame/Vector3 arg with target head position
+                for i, v in ipairs(args) do
+                    if typeof(v) == "CFrame" then
+                        args[i] = CFrame.new(target.Position)
+                    elseif typeof(v) == "Vector3" then
+                        args[i] = target.Position
+                    end
                 end
+                return oldNamecall(self, unpack(args))
             end
         end
     end
-    return oldIndex(self, key)
+
+    return oldNamecall(self, ...)
 end)
 
 setreadonly(mt, true)
