@@ -1,4 +1,3 @@
-
 -- ================================================
 --   WEEPING CHEATS  ::  Universal Aimbot + ESP
 --   Executors: Synapse X / Krnl / Fluxus / AWP
