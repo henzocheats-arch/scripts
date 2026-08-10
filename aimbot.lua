@@ -1,6 +1,4 @@
-got you — full **WEEPING CHEATS** build, single block, ready to paste into a raw host and loadstring. bigger menu, aimbot + ESP with respawn fix, no prediction garbage.
 
-```lua
 -- ================================================
 --   WEEPING CHEATS  ::  Universal Aimbot + ESP
 --   Executors: Synapse X / Krnl / Fluxus / AWP
